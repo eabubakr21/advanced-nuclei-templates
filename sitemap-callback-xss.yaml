@@ -1,0 +1,53 @@
+id: sitemap-callback-xss
+
+info:
+  name: Sitemap Callback Parameter XSS
+  author: eabubakr21
+  severity: medium
+  description: |
+    Detects potential reflected XSS/JSONP injection through the callback
+    parameter of a sitemap.xml endpoint. The template requires the unique
+    callback payload to be reflected in an executable JavaScript response
+    rather than merely appearing in an XML or HTML error response.
+  reference:
+    - https://owasp.org/www-community/attacks/xss/
+  classification:
+    cwe-id: CWE-79
+  tags: xss,jsonp,sitemap
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/sitemap.xml?callback=alert%283332%29"
+
+    redirects: true
+    max-redirects: 2
+
+    headers:
+      Accept: "application/javascript, text/javascript, */*"
+
+    matchers-condition: and
+    matchers:
+      # The callback must actually be reflected.
+      - type: word
+        part: body
+        words:
+          - "alert(3332)"
+
+      # The response must be JavaScript-compatible.
+      - type: regex
+        part: header
+        regex:
+          - '(?i)content-type:\s*(?:application|text)/javascript(?:\s*;|$)'
+
+      # Make sure this isn't simply an XML sitemap response.
+      - type: dsl
+        dsl:
+          - '!contains(tolower(header), "application/xml")'
+          - '!contains(tolower(header), "text/xml")'
+
+      # Require an executable-looking callback context.
+      - type: regex
+        part: body
+        regex:
+          - '(?s)(?:^|[\s;])alert\(3332\)(?:\s*\(|\s*,|\s*;)'
